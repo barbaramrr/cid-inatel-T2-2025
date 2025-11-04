@@ -1,4 +1,4 @@
-module       #(parameter W = 24) (
+module   counter_24    #(parameter W = 24) (
     input clk, reset, en,
     output reg [W-1:0] count
 );
