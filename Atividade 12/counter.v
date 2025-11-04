@@ -4,10 +4,10 @@ module counter #(parameter WIDTH = 8)(
     output reg carry
 );
 
-always @(posedge clk or posedge reset) begin
+always @(posedge clk) begin
     if (reset) begin
-        count <= 0;
-        carry <= 0;
+        count <= {WIDTH{1'b0}};
+        carry <= 1'b0;
     end
    else if (en) begin 
         count <= count;
@@ -15,12 +15,11 @@ always @(posedge clk or posedge reset) begin
     end
     else begin 
         if (count == {WIDTH{1'b1}}) begin
-            count <= 0;
-            en    <= 1
-            carry <= 1;
+            count <= {WIDTH{1'b0}};
+            carry <= 1'b1;
         end else begin
             count <= count + 1;
-            carry <= 0;
+            carry <= 1'b0;
         end
     end
 end
