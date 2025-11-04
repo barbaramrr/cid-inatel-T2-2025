@@ -1,8 +1,16 @@
 module DFF (
     input D, clk,rst,
-    output Q
+    output reg Q
 );
 
-assign Q = rst ? 1'b0: D;
+
+always @(posedge clk)
+begin
+  if (rst)
+    Q <= 0;
+  else
+    Q <= D;
+end
+
 
 endmodule
