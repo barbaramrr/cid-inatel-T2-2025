@@ -1,7 +1,6 @@
-# CI DIGITAL - INATEL T2 / 2025
+# CI DIGITAL: SD-100 - INTRODUÇÃO A MICROELETRÔNICA
 
 > Descrição da Residência em Circuitos Digitais:
-
 
 
 ## Módulos 

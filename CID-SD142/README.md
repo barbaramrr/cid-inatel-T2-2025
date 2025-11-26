@@ -1,7 +1,6 @@
-# CI DIGITAL - INATEL T2 / 2025
+# CI DIGITAL: SD-142 - CIRCUITO DIGITAL III
 
 > Descrição da Residência em Circuitos Digitais:
-
 
 
 ## Módulos 
