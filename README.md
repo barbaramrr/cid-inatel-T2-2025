@@ -2,24 +2,41 @@
 
 > Descrição da Residência em Circuitos Digitais:
 
-
-
 ## Módulos 
 
+> Introdução à Microeletrônica
 
+-
 
-## Projetos
+> Introdução a Verilog
 
+-
+
+> Circuito Digitais I
+
+-
+
+> Circuito Digitais II
+
+-
+
+> Circuito Digitais III
+
+-
+
+> 
 
 ### Etapas
 
+> Básica
+
+> Avançada
+
+## Projetos
 
 ### Relatórios
 
-
 ## Colaboradores
-
-
 
 ## Referências
 
