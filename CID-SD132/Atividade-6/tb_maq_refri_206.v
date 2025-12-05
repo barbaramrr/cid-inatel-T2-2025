@@ -12,7 +12,7 @@ module tb_maq_refri_206;
 
     always #5 clk = ~clk;
 
-    always @(moeda) begin
+    always @(posedge clk or moeda) begin
         if (rst)
             total <= 0;
         else begin
@@ -38,30 +38,29 @@ module tb_maq_refri_206;
         rst = 1; #10;
         rst = 0; #10;
 
-        moeda = 2'b01;  #5;
-        moeda = 2'b00; #5;
+        moeda = 2'b01;  #5; moeda = 2'b00; #5;
+        moeda = 2'b10; #5; moeda = 2'b00; #5;
 
-        moeda = 2'b10; #5;
-        moeda = 2'b00; #5;
-
-        moeda = 2'b10; #5;
-        moeda = 2'b00; #5;
+        moeda = 2'b10; #5; moeda = 2'b00; #5;
 
         rst = 1; #10; rst = 0; #10;
 
-        moeda = 2'b11; #5;
-        moeda = 2'b00; #5;
+        moeda = 2'b11; #5; moeda = 2'b00; #5;
 
         rst = 1; #10; rst = 0; #10;
 
-        moeda = 2'b10; #5;
-        moeda = 2'b00; #5;
+        moeda = 2'b10; #5; moeda = 2'b00; #5;
+        moeda = 2'b10; #5; moeda = 2'b00; #5;
+        moeda = 2'b10; #5;moeda = 2'b00; #5;
 
-        moeda = 2'b10; #5;
-        moeda = 2'b00; #5;
+        //////////////// Testando 1 caso invalido////////
 
-        moeda = 2'b10; #5;
-        moeda = 2'b00; #5;
+         rst = 1; #10; rst = 0; #10;
+
+        moeda = 2'b10; #5; moeda = 2'b00; #5;
+        moeda = 2'b01; #5; moeda = 2'b00; #5;
+        moeda = 2'b01; #5; 
+
 
         #20 $stop;
     end
