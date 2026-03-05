@@ -1,250 +1,366 @@
-/*
-Programa: CI Digital/INATEL  - Turma: 2 
-Trabalho Orientado I  - MESTRE I2C PARA LEITURA DE MEMÓRIA
-Orientador: Felipe Rocha 
-Grupo: 4
-Integrantes: 
-Alessandra Carolina Domiciano  
-Bruno Augusto Caetano Coura  
-Bárbara Mariana Rocha Raimundo  Emmanuel Priestley Titus 
-Fábio Henrique Moreira  
-Gabriel Kenedy Alves  
-Julia de Freitas Carvalho  
-Lucas Lares Fonseca  
-Luis Henrique Azevedo dos Santos
-Mateus Nassar Gouvêa Pereira  
-Samuel Josias Ross
-
-Data: Fevereiro/2026
-*/
-//////////////////////////////////////////////////////////
-////         Testbench MESTRE I2C              //////////////
-////////////////////////////////////////////////////////
-
-module testbench_i2c_fsm_v3 (
-    input wire clk,
-    input wire scl,
-    inout wire sda
-);
-
-   
-    // ----- Estados da FSM -----
+  module eeprom (
+    input           clock, // Clock do sistema
+    input           nReset, // Reset ativo em nível baixo
+    inout           SDA, // Linha de dados I2C
+    output          SCL  // Linha de clock I2C
     
-    localparam IDLE        = 3'd0,  // estado parado
-               RX_DEV_ADDR = 3'd1,  // recebe endereço do dispositivo
-               ACK_DEV     = 3'd2,  // enviando ack do endereço
-               RX_MEM_ADDR = 3'd3,  // recebendo endereço interno da memoria
-               ACK_MEM     = 3'd4,  // enviando ack do endereço da memória interno
-               TX_DATA     = 3'd5,  // Transmitindo dado ao mestre
-               MASTER_ACK  = 3'd6;  // mestre envia ACK, 0 contiua lendo, 1 quer parar NACK
+  );
 
-    parameter SLAVE_ADDR = 7'h50;   // endereço do escravo
 
+    //---------------- Lendo os dados da memoria de um arq txt --------------------------//////
+        reg [7:0] memoria [0:15];
+
+        initial begin
+        $readmemh("Dados.txt", memoria);
+        end  
     
-    // ----- Registradores internos -----
+        // ----- Estados da FSM -----
+        
+        localparam  IDLE            = 4'd0,     // estado parado zera alguns sinais
+                    RX_DEV_ADDR     = 4'd1,     // recebe endereço do dispositivo
+                    ACK_DEV         = 4'd2,     // enviando ack do endereço
+                    RX_MEM_ADDR     = 4'd3,     // recebendo endereço interno da memoria
+                    ACK_MEM         = 4'd4,     // enviando ack do endereço da memória interno
+                    WAIT_RESTART    = 4'd5,     // Espera o restart
+                    RX_DEV_ADDR_R   = 4'd6,     // ADDR + R
+                    ACK_ADDR_R      = 4'd7,     // enviando ack do endereço da EEPROM
+                    TX_DATA         = 4'd8,     // Transmitindo dado ao mestre
+                    MASTER_ACK      = 4'd9;     // mestre envia ACK, 0 contiua lendo, 1 quer parar NACK
 
-    reg [7:0] addr_ptr;   // armazena o indereço interno da memória
-    reg [7:0] shift_reg;  // registrador de deslocamnto para montar o byte recebido
-    reg [3:0] bit_cnt;    // contador de bits enviados e recebidos
-    reg [2:0] state;     // estado atual
-    reg rw_bit;          // bit de leitura ou escrita. 0 escrita e 1 leitura
-    reg sda_prev;        // valor anterior de SDA
-    
+        parameter SLAVE_ADDR = 7'h50;   // endereço da EEPROM
+        parameter TAMANHO_ENDERECO = 16;
 
-
-    reg sda_out;         // valor enviado
-    reg sda_en;          // valor recebido
-
-    wire [7:0] mem_data;  // dado recebido da memória
- 
- // ----Sincronização de SCL e SDA---
- 
-    reg scl_sync0, scl_sync1;   // reg para salvar estados do SCL
-    reg sda_sync0, sda_sync1;   // reg para salvar estado do SDA
-    reg sda_prev_sync;          // estado anterior SDA
-
-    always @(posedge clk) begin
-        scl_sync0 <= scl;        // salva estado do scl
-        scl_sync1 <= scl_sync0;  // salva estado anterior atraso de um pulso
-
-        sda_sync0 <= sda;        // salva estado do SDA
-        sda_sync1 <= sda_sync0;  // salva estado anterior atraso de um pulso
-
-        sda_prev_sync <= sda_sync1;   // salva estado anterior atraso de dois pulso de sda
-    end
-
-    wire scl_rising  = (scl_sync0 & ~scl_sync1);     // detecta pulso de subida de SCL
-    wire scl_falling = (~scl_sync0 & scl_sync1);     // detecta puslo de descida de SCL
-
-   wire start_cond = (sda_prev_sync == 1'b1) &&     // condição de START, quando ocorre transição de descida de SDA enquanto SCL esta em 1
-                  (sda_sync1     == 1'b0) &&        
-                  (scl_sync1     == 1'b1);
-
-   wire stop_cond  = (sda_prev_sync == 1'b0) &&    // condição STOP, quando ocorre transição de subida de SDA enquanto SCL esta em 1
-                  (sda_sync1     == 1'b1) &&       
-                  (scl_sync1     == 1'b1);
+        
+        // ----- Registradores internos -----
 
 
+        reg [6:0]   addr_ptr;                   // armazena o endereço que o mestre enviou
+        reg [6:0]   index;                      // armazena o indice que o mestre enviou
+        reg [7:0]   shift_reg;                   // registrador de deslocamnto para montar o byte recebido
+        reg [3:0]   bit_cnt;                    // contador de bits enviados e recebidos
+        reg [3:0]   state, next_state;          // estado atual / Proximo Estado
+        reg         rw_bit;                     // bit de leitura ou escrita. 0 escrita e 1 leitura
+        reg         ack_slave;                  // ack que o escravo manda
+        reg         done, send;                 // Indica o fim da contagem / Sck enviado 
+        reg [3:0]   nCycle;                     // Conta ciclos de SCL              
+        
+    //------------------ SDA DO SLAVE e Sinal que habilita o uso da linha SDA pelo SLAVE
 
-    
-    // ----- Instância da memória -----
+        reg         sda_out;                    // SDA enviado pela EEPROM
+        reg         sda_en;                     // Habita o envio pela EEPROM
+        reg         scl_ff1, scl_ff2;           // Estabilizadores
 
-    eeprom #(
-        .TAMANHO_DADOS(8),
-        .TAMANHO_ENDERECO(4)
-    ) memoria_inst (
-        .endereco(addr_ptr[3:0]), // usa apenas 4 bits
-        .clk(clk),
-        .dados_saida(mem_data)
-    );
+        // Como o clock do sistema, usado nos always é mais rápido que a comunicação é preciso esse buffers (sda_ff1, sda_ff2;)para garantir que está detectar mesmo a borda do SCL
 
-    
-    // ----- Controle Tri-State do SDA -----
+        reg         sda_ff1, sda_ff2;           
+        reg         scl_before,scl_reg;         // Usado para detectar as bordas do scl. Valor atual e antigo
+        reg         sda_before,sda_reg;         // Usado para detectar as bordas do sda. Valor atual e antigo. Assim detectar start e stop
+        reg         startDone, stopDone;
 
-    assign sda = (sda_en) ? sda_out : 1'bz;      // Se sda_en = 1, escravo dirige a linha. Se 0, linha fica em alta impedância.
+    // ----Sincronização de SCL e SDA---
 
-   
-    // ----- Inicialização -----
+    // -------------- Aqui é feito toda a lógica usada para decteção do start e stop
 
-    initial begin        // definição de valores iniciais
-        state   = IDLE;
-        sda_en  = 0;
-        sda_out = 1'b1;
-        bit_cnt = 0;
-        shift_reg = 8'd0;
-    end
+        always @(posedge clock or negedge nReset) begin
+            if (!nReset) begin
+                scl_ff1 <= 1'b1;
+                scl_ff2 <= 1'b1;
+                sda_ff1 <= 1'b1;
+                sda_ff2 <= 1'b1;
+                scl_before <= 1'b1;
+                sda_before <= 1'b1;
 
-    // ----- FSM I2C -----
-
-    always @(posedge clk) begin  
-                                 // por enquanto utilizando a borda de subida, mas tem que ser quando esta estável em 1
-
-    if (start_cond) begin
-    state   <= RX_DEV_ADDR;
-    bit_cnt <= 0;
-    sda_en  <= 0;
-    end
-
-    else if (stop_cond) begin
-    state  <= IDLE;
-    sda_en <= 0;
-    end
-
-    // ----- FSM roda sincronizada com CLK ----- 
-    
-    case(state)
-    
-            // ----------------------
-            IDLE: begin               // estado 000
-            sda_en  <= 0;             // desabilita que o escravo use a linha
-            bit_cnt <= 0;             // zera contador
-
-            end
-
-
-            // ----------------------
-            RX_DEV_ADDR: begin                    // estado 001
-                if (scl_rising) begin        
-                if (bit_cnt < 7) begin             // recebe 7 bits de endereço
-                    shift_reg[6-bit_cnt] <= sda_sync1;   // armazena bit recebido 
-                    bit_cnt <= bit_cnt + 1;        // incremento, até chegar os  bits 
-                end else begin                   // no 8° bit
-                    rw_bit <= sda_sync1;        // salva bit em rw_bit
-                    bit_cnt <= 0;               //zera contador
-                    state <= ACK_DEV;          // próximo estado
-                end
-            end
-        end
-
-            // ----------------------
-            ACK_DEV: begin                   // estado 010
-                if (scl_falling) begin
-                if (shift_reg == SLAVE_ADDR) begin    // verifica se o endereço enviado pelo mestre é o dele
-                    sda_en  <= 1;                          // habilita o escravo utilizar a linha
-                    sda_out <= 1'b0;  // ACK               // envia ACK baixo, dizendo que recebeu corretamente
-                end else begin
-                    state <= IDLE;
-                end
-            end
-                   if (scl_rising) begin
-                    sda_en <= 0;   // libera linha após ACK
-                   if (rw_bit == 1'b0)
-                    state <= RX_MEM_ADDR;
-                else
-                    state <= TX_DATA;
-                end
-            end
-    
-     
-
-            // ----------------------  
-            RX_MEM_ADDR: begin                          // estado 011 recebe endereço interno da memoria 
-                sda_en <= 0;                           // desabilita que o escravo use a 
-                if (scl_rising)begin
-                shift_reg[7-bit_cnt] <= sda_sync0;            // armazena o byte recebido bit a bit
-
-                if (bit_cnt == 7)                      // se já recebeu os 8 bits
-                    state <= ACK_MEM;                  // vai para o próximo estado
-                else
-                    bit_cnt <= bit_cnt + 1;           // se não, continua recebendo
-            end
-        end
-
-            // ----------------------
-            ACK_MEM: begin                     // estado 100
-                if (scl_falling) begin                    
-                addr_ptr <= shift_reg;         // copia o byte do shift_reg para addr_ptr, sera usado para acessar a memória
-                sda_en   <= 1;                 // habilita o uso da linha pelo o escravo
-                sda_out  <= 1'b0;              // envia ACK, dizendo que recebeu o endereço corretamente
-                end 
-                if (scl_rising) begin
-                    sda_en   <= 0;
-                    bit_cnt  <= 0;
-                    state  <= IDLE;
-                end
-            end
-
-            // ----------------------
-            TX_DATA: begin                         // estado 101 aqui o escravo envia o dado da memória para o mestre
-                sda_en  <= 1;                      // habilita o uso da linha pelo escravo
-                if(scl_falling) begin
-                sda_out <= mem_data[7-bit_cnt];    // envia o s 8 bits sendo o primeiro mais siguinificativo MSB
-                end
-                
-                if(scl_rising) begin
-                if (bit_cnt == 7) begin            // se já enviou os 8 bits
-                    bit_cnt <= 0 ;
-                    state <= MASTER_ACK;                // estado do envio do ACK DO MESTRE
-                end else begin
-                    bit_cnt <= bit_cnt + 1;      // se não, continua enviando
-                end
+            end else begin
+                scl_ff1 <= SCL;
+                scl_ff2 <= scl_ff1;
+                scl_before <= scl_reg;
+                sda_before <= sda_reg;
+                sda_ff1 <= SDA;
+                sda_ff2 <= sda_ff1;
+                scl_reg <= scl_ff2;
+                sda_reg <= SDA;
+               
             end
         end
         
+        wire scl_rise = (!scl_before && scl_reg  );
+        wire scl_fall = (scl_before && !scl_reg  );
 
-            MASTER_ACK: begin                   // estado 110 , aqui escravo aguarda o ACK ou NACK do mestre
-                sda_en <= 1'b0; 
-                if (scl_falling) begin   // 9º clock - mestre controla SDA
-                sda_en <= 1'b0;   // libera linha para o mestre
+
+        wire start_cond = (sda_before == 1'b1 &&        // condição de START, quando ocorre transição de descida de SDA enquanto SCL esta em 1
+                            sda_reg    == 1'b0 &&
+                            scl_reg    == 1'b1);
+                            
+        wire stop_cond = (sda_before == 1'b0 &&         // condição STOP, quando ocorre transição de subida de SDA enquanto SCL esta em 1
+                            sda_reg    == 1'b1 &&
+                            scl_reg    == 1'b1);
+
+
+
+
+    //-----------------------  SLAVE DIRIGE O SDA/ QUANDO NÃO DIRIGE COLOCA Z-------------------------------------
+
+        assign SDA = (sda_en) ? sda_out : 1'bz;      // Se sda_en = 1, escravo dirige a linha. Se 0, linha fica em alta impedância.
+
+    
+        //------ Always que atualiza o state
+
+        always @(posedge clock or negedge nReset) begin
+            if (!nReset)
+                state <= IDLE;
+            else
+                state <= next_state;
+        end
+    
+        //------------- Always com a lógoca de mudança de estados
+
+        always @(*) begin
+            next_state = state;
+  
+
+            case(state)
+                IDLE:           next_state = startDone  ? RX_DEV_ADDR   : IDLE;                         // Start detectado avança. Se não permanece em Idle
+                RX_DEV_ADDR:    next_state = done       ? ACK_DEV       : RX_DEV_ADDR;                  // Recebe os dados bit a bit até a contagem acabar. Mesmo para RX_MEM_ADDR e RX_DEV_ADDR_R
+
+                ACK_DEV: begin
+                                if (send) begin
+                                    if (!ack_slave) begin                                               // Caso ack = 1 (erro) desvia para Idle. Caso contrário avança. O mesmo para ACK_MEM e ACK_ADDR_R
+                                        next_state = RX_MEM_ADDR; 
+                                    end
+                                    else
+                                        next_state =  IDLE; 
+                                end
+                                else
+                                        next_state = ACK_DEV;
                 end
 
-                if (scl_rising) begin
-                if (sda_sync0 == 1'b0) begin // Mestre enviou ACK igual a 0 → continua enviando próximo byte
-                    state <= TX_DATA;
-                    addr_ptr <= addr_ptr + 1;       // se estiver usando endereço sequencial:
-                    //mem_data <= memoria[addr_ptr + 1];
-                end else begin  // Mestre enviou NACK → encerra transmissão
-                    state <= IDLE;
+                RX_MEM_ADDR:    next_state = done       ? ACK_MEM       : RX_MEM_ADDR;
+
+                ACK_MEM:    begin
+                                if (send) begin
+                                    if (!ack_slave) begin
+                                        next_state = WAIT_RESTART; 
+                                    end
+                                    else
+                                        next_state =  IDLE; 
+                                end
+                                else
+                                        next_state = ACK_MEM;
+                            end   
+                WAIT_RESTART:
+                            if (startDone)                        
+                                next_state = RX_DEV_ADDR_R;                         
+                            else if (stopDone)
+                                next_state = IDLE;
+                            else
+                                next_state = WAIT_RESTART;
+
+                RX_DEV_ADDR_R:  next_state = done           ? ACK_ADDR_R    : RX_DEV_ADDR_R;
+
+                ACK_ADDR_R:     begin
+                                    if (send) begin
+                                        if (!ack_slave) begin
+                                            next_state = TX_DATA; 
+                                        end
+                                        else
+                                            next_state =  IDLE; 
+                                    end
+                                    else
+                                            next_state = ACK_ADDR_R;
+                                end  
+                TX_DATA:        next_state = done           ?   MASTER_ACK    : TX_DATA;
+                MASTER_ACK:     next_state = (ack_slave)    ?   IDLE :MASTER_ACK;
+            default:         next_state = IDLE;
+            endcase
+
+        end
+
+
+        always @(posedge clock or negedge nReset) begin
+            if (!nReset) begin
+                bit_cnt <= 3'd7;
+                done    <= 0;
+                shift_reg <= 0;
+                addr_ptr  <= 0;
+                nCycle    <= 0;
+                index     <= 0;
+                rw_bit      <= 0;
+               
+
+            end else begin
+                done <= 0;
+                startDone <= start_cond;
+                stopDone  <= stop_cond;
+
+//------ If usado para carregar o contador com o valor de 7 e o done com 0 para os estados que vão usa-los. Para que iniciem com o valor correto sempre
+
+                if (state != next_state) begin
+                    if (next_state == RX_DEV_ADDR   ||
+                        next_state == RX_DEV_ADDR_R ||
+                        next_state == RX_MEM_ADDR   ||
+                        next_state == TX_DATA) begin
+                        bit_cnt <= 3'd7;
+                        done    <= 1'b0;
                     end
                 end
+                case(state)
+
+                    IDLE: begin
+                        bit_cnt <= 3'd7;
+                    end
+//------------------------ Recebe endereço no primeiro envio e no segundo
+
+                    RX_DEV_ADDR ,RX_DEV_ADDR_R: begin
+                        if (scl_fall) begin                 
+                            send <= 1'b0;
+                            shift_reg[bit_cnt] <= SDA;
+                            if (bit_cnt == 0) begin
+                                bit_cnt <= 3'd7;
+                                done   <= 1;
+                            end else begin
+                                done <= 0;
+                                bit_cnt <= bit_cnt - 1;
+                            end
+                        end
+                        if (scl_rise) begin
+                            addr_ptr <= shift_reg [7:1];                // Armazena em Rise
+                            rw_bit <= (bit_cnt == 0)?SDA: 0;
+                        end
+                    end
+
+//----------------------- Recebe o indice da memória a ser acessado
+
+                    RX_MEM_ADDR: begin
+                        if (scl_fall) begin
+                            send <= 1'b0;
+                            shift_reg[bit_cnt] <= SDA;
+                            if (bit_cnt == 0) begin
+                                shift_reg <= shift_reg[7:1];
+                                bit_cnt <= 3'd7;
+                                done    <= 1'b1;
+                            end else begin
+                                bit_cnt <= bit_cnt - 1;
+                                done <= 0;  
+                            end
+                        end
+                        
+                        if (scl_rise) begin
+                            index <= shift_reg[7:1];        // Armazena em Rise
+                            rw_bit <= (bit_cnt == 0)?SDA: 0;
+                        end
+                        
+                    end           
+/// ------------------------- Usado para decrementar o contador do dado que será enviado. É decrementado em rise, mas enviado em fall. Pq mudanças no SDA de ocorrer em scl low
+
+                    TX_DATA: begin
+                        if (scl_rise) begin
+                            if (bit_cnt == 0) begin
+                                bit_cnt <= 3'd7;
+                                done <= 1;
+                            end else
+                                bit_cnt <= bit_cnt - 1;
+                        end
+                    end
+
+                endcase
+
+// -------------- Contador usado para contar ciclos e assim fazer a fsm ficar no estados de ack por um ciclo de scl
+
+                 if (state ==ACK_DEV || state== ACK_ADDR_R || state == ACK_MEM) begin
+                    if(scl_rise)
+                        nCycle <= nCycle + 1'b1;
+                    end
+
+            end
+        end
+
+        
+        // ---------- Envio ACK e dos dados da EEPROM via SDA. SDA é altera só em scl Low --------------------------------
+
+
+        always @(negedge clock) begin
+            if (!nReset) begin
+              
+                ack_slave <= 0;
+                sda_out   <= 0;
+                send      <= 0;
+
+            end else begin
+
+            case(state)
+
+                ACK_DEV, ACK_ADDR_R: begin
+               
+                    sda_en  <= 1;
+                    send    <= 0;
+                    if (scl_rise) begin
+                        addr_ptr <= shift_reg[7:1];
+                    end
+                    if (addr_ptr == SLAVE_ADDR ) begin
+                        sda_out <= 0;      // ACK                    
+                    end else begin
+                        sda_out <= 1;      // NACK   
+                    end
+                    if (nCycle == 1) begin
+                        send <= 1'b1; 
+                        nCycle <= 0;
+                    end
+//------------------  Caso RW seja o errado ------------------
+
+                    if ((addr_ptr == SLAVE_ADDR) && (rw_bit == (state == ACK_ADDR_R)))
+                        sda_out <= 1'b0;   // ACK
+                    else
+                        sda_out <= 1'b1;  
+                end
+
+                ACK_MEM: begin
+                    sda_en  <= 1;
+                    send    <= 0;
+                        if (index < TAMANHO_ENDERECO) begin
+                            sda_out <= 0;      // ACK
+                            
+                        end else begin
+                            sda_out <= 1;      // NACK   
+                    
+                    end
+                    if (nCycle == 1) begin
+                        send <= 1'b1; 
+                        nCycle <= 0;
+                    end
+            
+                end  
+            
+        // ------------------ Recebe ACk do mestre
+
+                MASTER_ACK: begin
+                    done    <= 0;
+                        ack_slave <= SDA;    
+
+                     if (nCycle == 1) begin
+                        done <= 1'b1; 
+                        nCycle <= 0;
+
+                     end
+                end
+         // ------------------- Envio do Dado----------------------
+
+                TX_DATA: begin
+                    if (scl_fall) begin
+                        sda_en  <= 1;
+                        sda_out <= memoria[index][bit_cnt];
+                    end
+                end
+                
+                default: begin
+                    sda_en <= 0;
+                end
+            
+            
+            endcase
+
+            
 
             end
 
-            // ----------------------
-            default: state <= IDLE;          // volta ao estado inicial
-
-        endcase
-    end
-    
-
+        end
 endmodule
