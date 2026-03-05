@@ -1,102 +1,143 @@
-//Modulo criado para transmissao e recepcao do byte bit a bit
+
 module BitShift (
-    input systemClk,
-    input scl,
-    input nReset,
-    input [1:0] mode,   //para indicar se está carregando byte, transmitindo bit ou recebendo bit
+    input       systemClk,  
+    input       scl,
+    input       nReset,
+    input [1:0] mode,
     input [7:0] txByte,
-    input enableSdaDrive,
-    input sclLow,
-    input sclRise,
-    input sclFall,
-    output done,     //byte completo
-    inout sdaOut,   //modulo sdoio
-    input sda_in,  //modulo sdaio. Manda valor para o slave
-    output [7:0] rxByte,
-    output ack_shift
+    input       enableSdaDrive,
+    input       sclLow,
+    input       sclRise,
+    input       sclFall,
+    output      done,
+    inout       sdaOut,
+    input       sda_in,
+    output [7:0]rxByte, 
+    output      send,   
+    output      ack_shift
 );
 
     reg [7:0] regShift;
     reg [2:0] bitCount;
-    reg regDone;
-    reg sdaReg;
-    reg load;
-    reg ack;
-    reg [3:0] rxBitCount;
-    integer k;
+    reg [2:0] rxBitCount;
 
-    localparam MODE_IDLE = 2'b00;
-    localparam MODE_LOAD = 2'b01;
-    localparam MODE_TX = 2'b10;
-    localparam MODE_RX = 2'b11;
+    
+    
+    reg [3:0]   rx_cycle;  
+    reg         txDone;
+    reg         rxDone;
+    reg         sdaReg;
+    reg         ack;
+    reg         sendACK;
 
+    localparam MODE_IDLE   = 2'b00;
+    localparam MODE_TX     = 2'b01;
+    localparam MODE_RX     = 2'b10;
+    localparam MODE_RX_ACK = 2'b11;
+
+    // ----------------------------------------------------
+    // TRANSMISSÃO (SDA muda em FALL) 
+    // ----------------------------------------------------
     always @(negedge systemClk or negedge nReset) begin
         if (!nReset) begin
-            regShift <= 8'd0;
             bitCount <= 3'd7;
-            regDone <= 1'b0;
-            sdaReg <= 1'b1;
-            load <= 0;
-            ack <= 0;
-            rxBitCount <= 0;
-            k <= 0;
+            regShift <= 8'd0;
+            sdaReg   <= 1'b1;
+            txDone   <= 1'b0;
+           
         end else begin
-            regDone <= 1'b0;
-            case(mode)
+            txDone <= 1'b0; // Zera o done de TX por padrão
+
+            case (mode)
                 MODE_IDLE: begin
                     bitCount <= 3'd7;
-                    rxBitCount <= 0;
-                    sdaReg <= 1'b1;
+                    sdaReg   <= 1'b1;
                 end
 
-                MODE_TX: begin
-                    if (bitCount == 3'd7) begin
-                        regShift <= txByte;
-
-                    end
-                    
-                    if (sclLow) begin
-                        load <= 0;
-                        sdaReg <= regShift[bitCount];
-                    end
-                   // if (sclFall) begin
+                 MODE_TX: begin
+                    if (sclFall) begin
+                         if (bitCount == 3'd7) begin
+                            regShift <= txByte; 
+                            sdaReg   <= txByte[7]; 
+                            
+                        end                    
                         if (bitCount == 0) begin
                             bitCount <= 3'd7;
-                            regDone <= 1'b1;
-                            ack = sda_in;
-
-                        end else
-                            bitCount <= bitCount - 1'b1;
-    
-                    //end
-
-                end             
-
-                MODE_RX: begin                  
-                        if (rxBitCount == 7) begin
-                            regDone <= 1'b1;
-                            rxBitCount <= 0;
+                            //sdaReg   <= 0;   
+                            txDone   <= 1'b1; 
                         end else begin
-                            rxBitCount <= rxBitCount + 1;
+                            bitCount <= bitCount - 1'b1;                
                         end
-                end
+                        
+                    end
 
-                default: ;
+                    if (sclRise) begin
+                        sdaReg <= regShift[bitCount];
+                    end
+                end
+                
             endcase
         end
     end
 
-    always @(posedge systemClk ) begin
-        regShift[rxBitCount] <= sda_in;
-            if ( bitCount == 3'd7) begin
-                ack      <= sda_in;
+
+    // RECEPÇÃO + DONE (amostra em RISE)
+    // ---------------------------------------------------------
+   always @(posedge systemClk or negedge nReset) begin
+    if (!nReset) begin
+        bitCount    <= 3'd7;   // contador principal
+        rxBitCount  <= 3'd7;   // índice de escrita
+        rxDone      <= 1'b0;
+        ack         <= 1'b0;
+        sendACK     <= 1'b0;
+        rx_cycle    <= 4'd0;
+      
+    end else begin
+
+            rxDone  <= 1'b0;
+            sendACK <= 1'b0;
+
+            if (mode == MODE_RX) begin
+                if (sclFall) begin
+                    rxBitCount <= bitCount; // Usado para sincronizar novamente com a EEPROM. 
+                    if (bitCount == 0) begin
+                        bitCount <= 3'd7;
+                        rxDone   <= 1'b1;
+                    end else begin
+                        bitCount <= bitCount - 1'b1;
+                    end
                 end
-        
+
+                if (sclRise) begin
+                    regShift[rxBitCount] <= sda_in;
+                end
+
+            end      
+            
+            if (mode == MODE_RX_ACK) begin   
+                if (sclRise) begin
+                    rx_cycle <= rx_cycle + 1'b1;
+                end
+                
+                ack <= sda_in;
+                
+                if (rx_cycle == 1) begin
+                    sendACK  <= 1'b1; 
+                    rx_cycle <= 4'd0;
+                end    
+                end else begin
+                rx_cycle <= 4'd0;
+            end
+        end
     end
 
-    assign ack_shift = ack;
-    assign sdaOut = (mode == MODE_TX && enableSdaDrive) ? sdaReg : 1'bz;
-    assign rxByte = regShift;
-    assign done = regDone;
+    // Como tem um done para enviar e um para receber dados. É preciso fazer um OU entre eles. 
+    // Assim manda um sempre que termina o envio OU a recepção.
+
+    assign done         = txDone | rxDone;  
+    assign ack_shift    = ack;
+    assign send         = sendACK;
+    assign sdaOut       = (mode == MODE_TX && enableSdaDrive) ? sdaReg : 1'bz;
+    assign rxByte       = regShift;
 
 endmodule
