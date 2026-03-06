@@ -2,7 +2,7 @@
     input           clock, // Clock do sistema
     input           nReset, // Reset ativo em nível baixo
     inout           SDA, // Linha de dados I2C
-    output          SCL  // Linha de clock I2C
+    input          SCL  // Linha de clock I2C
     
   );
 
@@ -16,7 +16,7 @@
     
         // ----- Estados da FSM -----
         
-        localparam  IDLE            = 4'd0,     // estado parado zera alguns sinais
+        localparam  IDLE            = 4'd0,     // estado inicial zera alguns sinais. Espera a detecção do Start
                     RX_DEV_ADDR     = 4'd1,     // recebe endereço do dispositivo
                     ACK_DEV         = 4'd2,     // enviando ack do endereço
                     RX_MEM_ADDR     = 4'd3,     // recebendo endereço interno da memoria
@@ -56,6 +56,7 @@
         reg         scl_before,scl_reg;         // Usado para detectar as bordas do scl. Valor atual e antigo
         reg         sda_before,sda_reg;         // Usado para detectar as bordas do sda. Valor atual e antigo. Assim detectar start e stop
         reg         startDone, stopDone;
+        reg         nack_rx;
 
     // ----Sincronização de SCL e SDA---
 
@@ -169,7 +170,14 @@
                                             next_state = ACK_ADDR_R;
                                 end  
                 TX_DATA:        next_state = done           ?   MASTER_ACK    : TX_DATA;
-                MASTER_ACK:     next_state = (ack_slave)    ?   IDLE :MASTER_ACK;
+                MASTER_ACK:    begin
+                    if (nack_rx) begin
+                        next_state = (ack_slave)    ?   IDLE :MASTER_ACK; 
+                    end
+                    else
+                         next_state = MASTER_ACK;
+                end
+                
             default:         next_state = IDLE;
             endcase
 
@@ -182,7 +190,6 @@
                 done    <= 0;
                 shift_reg <= 0;
                 addr_ptr  <= 0;
-                nCycle    <= 0;
                 index     <= 0;
                 rw_bit      <= 0;
                
@@ -212,7 +219,6 @@
 
                     RX_DEV_ADDR ,RX_DEV_ADDR_R: begin
                         if (scl_fall) begin                 
-                            send <= 1'b0;
                             shift_reg[bit_cnt] <= SDA;
                             if (bit_cnt == 0) begin
                                 bit_cnt <= 3'd7;
@@ -232,7 +238,7 @@
 
                     RX_MEM_ADDR: begin
                         if (scl_fall) begin
-                            send <= 1'b0;
+
                             shift_reg[bit_cnt] <= SDA;
                             if (bit_cnt == 0) begin
                                 shift_reg <= shift_reg[7:1];
@@ -249,7 +255,8 @@
                             rw_bit <= (bit_cnt == 0)?SDA: 0;
                         end
                         
-                    end           
+                    end     
+
 /// ------------------------- Usado para decrementar o contador do dado que será enviado. É decrementado em rise, mas enviado em fall. Pq mudanças no SDA de ocorrer em scl low
 
                     TX_DATA: begin
@@ -263,14 +270,6 @@
                     end
 
                 endcase
-
-// -------------- Contador usado para contar ciclos e assim fazer a fsm ficar no estados de ack por um ciclo de scl
-
-                 if (state ==ACK_DEV || state== ACK_ADDR_R || state == ACK_MEM) begin
-                    if(scl_rise)
-                        nCycle <= nCycle + 1'b1;
-                    end
-
             end
         end
 
@@ -280,12 +279,19 @@
 
         always @(negedge clock) begin
             if (!nReset) begin
-              
+                nCycle    <= 0;
                 ack_slave <= 0;
                 sda_out   <= 0;
                 send      <= 0;
+                nack_rx   <= 0;
 
             end else begin
+
+// -------------- Contador usado para contar ciclos e assim fazer a fsm ficar no estados de ack por um ciclo de scl
+            if (state ==ACK_DEV || state== ACK_ADDR_R || state == ACK_MEM || state == MASTER_ACK) begin
+                if(scl_rise)
+                    nCycle <= nCycle + 1'b1;
+                end
 
             case(state)
 
@@ -293,13 +299,13 @@
                
                     sda_en  <= 1;
                     send    <= 0;
-                    if (scl_rise) begin
-                        addr_ptr <= shift_reg[7:1];
-                    end
+          
                     if (addr_ptr == SLAVE_ADDR ) begin
-                        sda_out <= 0;      // ACK                    
+                        sda_out     <= 0;      // ACK    
+                        ack_slave   <=  1'b0;                
                     end else begin
-                        sda_out <= 1;      // NACK   
+                        sda_out     <= 1;      // NACK   
+                        ack_slave   <=  1'b1;
                     end
                     if (nCycle == 1) begin
                         send <= 1'b1; 
@@ -307,20 +313,28 @@
                     end
 //------------------  Caso RW seja o errado ------------------
 
-                    if ((addr_ptr == SLAVE_ADDR) && (rw_bit == (state == ACK_ADDR_R)))
-                        sda_out <= 1'b0;   // ACK
-                    else
-                        sda_out <= 1'b1;  
+                    if ((addr_ptr == SLAVE_ADDR) && (rw_bit == (state == ACK_ADDR_R))) begin
+                        sda_out     <= 1'b0;   // ACK
+                        ack_slave   <=  1'b0;
+                    end
+
+                    else begin
+                        sda_out     <= 1'b1;  
+                        ack_slave   <=  1'b1;
+                    end
+
                 end
 
                 ACK_MEM: begin
                     sda_en  <= 1;
                     send    <= 0;
                         if (index < TAMANHO_ENDERECO) begin
-                            sda_out <= 0;      // ACK
+                            sda_out     <= 0;      // ACK
+                            ack_slave   <=  1'b0;
                             
                         end else begin
-                            sda_out <= 1;      // NACK   
+                            sda_out     <= 1;      // NACK   
+                            ack_slave   <=  1'b1;
                     
                     end
                     if (nCycle == 1) begin
@@ -329,19 +343,21 @@
                     end
             
                 end  
-            
-        // ------------------ Recebe ACk do mestre
+
+              // ------------------ Recebe ACk do mestre
 
                 MASTER_ACK: begin
-                    done    <= 0;
+
                         ack_slave <= SDA;    
 
                      if (nCycle == 1) begin
-                        done <= 1'b1; 
+                        nack_rx <= 1'b1; 
                         nCycle <= 0;
 
                      end
-                end
+                end      
+            
+  
          // ------------------- Envio do Dado----------------------
 
                 TX_DATA: begin
