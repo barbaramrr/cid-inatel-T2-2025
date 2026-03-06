@@ -35,6 +35,7 @@ module i2c_master_top (
     wire        sdaOutBitShift;   // SDA controlado pelo BitShift
     wire        sdaMux;
     wire [7:0]  data;
+    wire        en;
 
 
     // SclGen
@@ -116,21 +117,18 @@ module i2c_master_top (
         .sdaDrive   (sdaDriveFSM),
         .enableSdaDrive (enableSdaDrive),
         .data       (data),
+        .en (en),
         .Led        (Led)
     );
 
     display7seg dis (
         .data       (data_lo),
         .error      (Led),
+        .en         (en),
         .seg        (display)
     );
 
-    eeprom Mem (
-        .clock      (clock),
-        .nReset     (nReset),
-        .SDA        (SDA),
-        .SCL        (SCL)
-    );
+
 
     assign SDA = enableSdaDrive ? sdaMux : 1'bz;
     
