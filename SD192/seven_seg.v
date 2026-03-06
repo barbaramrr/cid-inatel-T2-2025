@@ -3,14 +3,18 @@
 
 module display7seg(
     input  [3:0] data,
-    input  error,
+    input  error, en,
     output reg [7:0] seg   // Segmentos do display {a,b,c,d,e,f,g,dp}
 );
 
 always @(*) begin
+
     if (error) begin
         seg = 8'b00000001;   // Indicativo de Erro (somente o ponto (dp) ligado)
-    end else begin
+    end else if (!en) begin
+        seg = 8'b00000000; // apagado
+        end
+    else begin
         case (data)
             4'h0: seg = 8'b11111101; // 0
             4'h1: seg = 8'b01100001; // 1
