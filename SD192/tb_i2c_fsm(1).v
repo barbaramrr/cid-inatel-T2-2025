@@ -25,7 +25,7 @@
             .SCL(SCL)
         );
 
-        eeprom uut (
+        eeprom uut2 (
         .clock      (clock),
         .nReset     (nReset),
         .SDA        (SDA),
@@ -33,10 +33,12 @@
     );
 
 
+
+
     always #10 clock = ~clock;
     ///----------------------------Estimulos-----------------////
-       integer file_in;
-integer file_out;
+        integer file_in;
+        integer file_out;
 
         initial begin
             file_in  = $fopen("addr_idxMem.txt", "r");
@@ -69,7 +71,7 @@ integer file_out;
 
         initial begin
             $monitor("T=%0t | FSMState=%0d |  EEPROM state=%0d | SDA=%b | SCL = %b | Addr=%7b | Idx=%7b  | Led =%b | Dado = %8b",
-                $time, uut.fsm_inst.current_state, uut.Mem.state, SDA, SCL, uut.Mem.addr_ptr, uut.Mem.index,uut.fsm_inst.Led, uut.dis.seg );
+                $time, uut.fsm_inst.current_state, uut2.state, SDA, SCL, uut2.addr_ptr, uut2.index,uut.fsm_inst.Led, uut.dis.seg );
 
         end
 
