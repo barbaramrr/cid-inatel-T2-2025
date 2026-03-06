@@ -26,6 +26,7 @@ module i2c_fsm_v2 (
 	output          enableSdaDrive,   // Habilita o mestre a dirigir a linha SDA (1 = mestre controla SDA, 0 = alta impedância)
     output  [7:0]   data,          // Saída para display de 7 segmentos
     output          Led,                // LED indica erro 
+    output          en,                 // Habitar a exibição no display
     output          scl_en              // Coloca SCL =1 para gerar Start, Restart e Stop
 
     
@@ -41,6 +42,7 @@ module i2c_fsm_v2 (
     reg         rscl_en;                // reg para atribuir scl_en
     reg         startGen, stopGen;      // Indica que start e stop foram gerados, habilitando a transição para proximo estado
     reg         ackrx;                  // reg para atribuir ack
+    reg         d_en;
 
 	//registradores internos
     reg [1:0]   rShiftMode;             // reg para atrinuir   shiftMode
@@ -79,12 +81,6 @@ module i2c_fsm_v2 (
             current_state   <= S0;
             timeout         <= 4'b0000;
             contador_acks   <= 2'b00;
-            erro            <= 1'b0;
-            Data            <= 8'b00000000;
-            restart         <= 0;
-            sclCycle        <= 2'b00;
-            startGen        <= 1'b0;
-            stopGen         <= 1'b0;
             ackrx           <= 0;
 
         end else begin
@@ -186,14 +182,30 @@ module i2c_fsm_v2 (
 
     always @(*) begin
 
-            rShiftMode        = MODE_IDLE;
-            rTxByte           = 8'h00;
-            rEnableSdaDrive   = 1'b0;
-            rSdaDrive         = 1'b1;
-            restart           = 0;
-            rscl_en           = 1'b0; 
-            startGen          = 1'b0;
-            stopGen           = 1'b0;
+        if (!nReset) begin
+            rShiftMode          = MODE_IDLE;
+            rTxByte             = 8'h00;
+            rEnableSdaDrive     = 1'b0;
+            rSdaDrive           = 1'b1;
+            restart             = 0;
+            rscl_en             = 1'b0; 
+            startGen            = 1'b0;
+            stopGen             = 1'b0;
+            erro                = 0;
+            Data                = 8'b0;
+            d_en                = 1'b0;
+        end
+
+        else
+            rShiftMode        = rShiftMode;
+            rTxByte           = rTxByte;
+            rEnableSdaDrive   = rEnableSdaDrive;
+            rSdaDrive         = rSdaDrive;
+            restart           = restart;
+            rscl_en           = rscl_en; 
+            startGen          = startGen;
+            stopGen           = stopGen;
+            d_en              = d_en;
 
 
         case (current_state)
@@ -207,7 +219,8 @@ module i2c_fsm_v2 (
 
             // GERA_START - pulso de início
             S1: begin
-                rEnableSdaDrive = 1'b1;
+             rEnableSdaDrive = 1'b1;
+                rSdaDrive = 1'b1;
                 case (sclCycle )
                     2'd0:begin
                         rSdaDrive = 1'b1;
@@ -215,12 +228,17 @@ module i2c_fsm_v2 (
                     end 
                     2'd1: begin
                         rSdaDrive = 1'b0;
-                        rscl_en = 1'b1;
-                        startGen = 1;
-                    end
+                        rscl_en = 1'b0;
 
+                    end
+                    2'd2: begin             //Garante
+                        rSdaDrive = 1'b0;
+                        rscl_en = 1'b1;
+                        startGen = 1'b1;
+                    end
                 endcase
             end
+            
 
 			// ENVIA_ENDERECO_ESCRITA via Mode_tx
             S2: begin
@@ -259,24 +277,22 @@ module i2c_fsm_v2 (
           
             S6: begin
 
-                rEnableSdaDrive = 1'b1;
-                case (sclCycle)
+               rEnableSdaDrive = 1'b1;
+                rSdaDrive = 1'b1;
+                case (sclCycle )
                     2'd0:begin
-                        rSdaDrive = 1'b1; // PASSO 1: Prepara SDA em ALTO
-                        rscl_en = 1'b0;   // Trava SCL em ALTO
+                        rSdaDrive = 1'b1;
+                        rscl_en = 1'b0;
                     end 
                     2'd1: begin
-                        rSdaDrive = 1'b1; // PASSO 2: Mantém SDA em ALTO de forma estável
+                        rSdaDrive = 1'b0;
                         rscl_en = 1'b0;
+
                     end
-                    2'd2: begin           
-                        rSdaDrive = 1'b0; // PASSO 3: SDA desce enquanto SCL está ALTO (Gera o RESTART perfeito!)
-                        rscl_en = 1'b1;   // Libera o SCL para voltar a oscilar e transmitir o endereço
-                        restart = 1'b1;
-                    end
-                    default: begin
+                    2'd2: begin             //Garante
                         rSdaDrive = 1'b0;
                         rscl_en = 1'b1;
+                        restart = 1'b1;
                     end
                 endcase
                    
@@ -341,6 +357,7 @@ module i2c_fsm_v2 (
 			// Manda o valor lido para o display
             S13: begin
                 Data = Data;
+                d_en = 1'b1;
             end
 
             default: begin
@@ -358,6 +375,7 @@ module i2c_fsm_v2 (
     assign data             = Data;
     assign Led              = erro;
     assign scl_en           = rscl_en;
+    assign en               = d_en;
 
 
 endmodule
