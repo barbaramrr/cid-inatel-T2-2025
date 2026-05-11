@@ -31,6 +31,15 @@ module control_unit (
                 alu_op = 2'b10;
                 branch = 1'b0;
             end
+            7'b0010011: begin // Operações do tipo I aritmetica
+                reg_write = 1'b1;
+                mem_to_reg = 1'b0;
+                mem_read = 1'b0;
+                mem_write = 1'b0;
+                alu_src = 1'b1;
+                alu_op = 2'b10; 
+                branch = 1'b0;
+            end
             7'b0000011: begin // Operações do tipo I 
                 reg_write = 1'b1;
                 mem_to_reg = 1'b1;

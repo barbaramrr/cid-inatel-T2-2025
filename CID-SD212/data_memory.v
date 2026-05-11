@@ -8,26 +8,20 @@
 //////////////////////////////////////////////////////////////////
 
 module data_memory (
-    input   clk,                         // clock ( um ciclo de clock por instrução )
-    input   mem_write,                   // Sinal de controle para escrita em memória
-    input   mem_read,                    // Sinal de controle para leitura de memória 
-    input   [31:0] addr,                // Endereço de 32 bits
-    input   [31:0] data_w,          // Dados a serem escritos na memória
-    output  [31:0] data_r         // Dados lidos da memória
+    input   clk,
+    input   mem_write,
+    input   mem_read,
+    input   [31:0] addr,
+    input   [31:0] data_w,
+    output  [31:0] data_r
 );
+    reg [31:0] mem [0:255];
 
-    reg [31:0] data_rr; // registrador para ser usado no always
-    reg [31:0] mem [0:255];  
 
     always @(posedge clk) begin
-        if (mem_write) begin
-            mem[addr>>2] <= data_w; // Escrever dados na memória usando endereçamento por byte por isso é preciso dividir por 4
-        end
-        if (mem_read) begin
-            data_rr <= mem[addr>>2]; // Ler dados da memória usando endereçamento por byte por isso é preciso dividir por 4
-        end
+        if (mem_write)
+            mem[addr >> 2] <= data_w;
     end
 
-    assign data_r = data_rr;
-    
-    endmodule
+    assign data_r = (mem_read) ? mem[addr >> 2] : 32'b0;
+endmodule

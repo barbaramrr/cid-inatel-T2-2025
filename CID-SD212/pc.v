@@ -9,8 +9,10 @@
 
 module PC (
     input  clk,                         // clock ( um ciclo de clock por instrução )
-    input  rst,                       // sinal de controle para indicar se é um branch        
-    input   [31:0]  next_pc,            // próximo valor de PC
+    input  rst, 
+   // input  branch,
+   // input  Zero,
+    input   [31:0]  nextPc,         //valor estendido do imediato usado em caso de branch
     output  [31:0] pc                   // valor atual de PC
 );
 
@@ -22,9 +24,9 @@ module PC (
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             pc_reg <= 32'b0; 
-        end else 
-            pc_reg <= next_pc; // Atualiza o valor de PC para o próximo valor calculado
+        end else begin
+            pc_reg <= nextPc; // Atualiza o PC com o próximo valor calculado
+        end
     end
-            
 
 endmodule

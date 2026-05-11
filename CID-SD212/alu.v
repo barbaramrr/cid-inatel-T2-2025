@@ -6,7 +6,7 @@
 ///////////////////////////////////////////////////////////////////
                 // ALU
 //////////////////////////////////////////////////////////////////
-module ALU (
+module alu (
     input   [31:0]  A, B,                   // Entradas dos operandos
     input   [3:0]   alu_control,          // Sinal de controle para selecionar a operação
     output  [31:0]  result,             // Resultado da operação da ALU
