@@ -20,7 +20,7 @@ module rv32i_single_cycle_top (
     wire [6:0]  funct7;
     wire [4:0]  rd, rs1, rs2;
     
-    wire reg_write, mem_to_reg, mem_read, mem_write, alu_src, branch;
+    wire reg_write, mem_to_reg, mem_read, mem_write, alu_src, branch, jump;
     wire [1:0]  alu_op;
     wire [3:0]  alu_control; 
     
@@ -31,14 +31,11 @@ module rv32i_single_cycle_top (
     
     wire zero_flag;
 
-    assign next_pc = branch & zero_flag ? add_result : (pc + 4);
+    assign next_pc = (jump ||(branch && zero_flag ))? add_result : (pc + 4);
 
     PC PC1 (
         .clk(clk),
         .rst(rst),
-        //.branch(branch),
-        //.immgen_out(immgen_out),
-        //.Zero(zero_flag),
         .pc(pc),
         .nextPc(next_pc)
     );
@@ -62,7 +59,8 @@ module rv32i_single_cycle_top (
         .mem_write(mem_write),
         .alu_src(alu_src),
         .alu_op(alu_op),
-        .branch(branch)
+        .branch(branch),
+        .jump(jump)
     );
 
     decoder DEC (
@@ -115,7 +113,7 @@ module rv32i_single_cycle_top (
     );
 
     
-    assign data_src = mem_to_reg ? data_r : alu_result;
+    assign data_src =  jump ? (pc + 4) : (mem_to_reg ? data_r : alu_result);
 
     immgen IMM (
         .inst(inst),

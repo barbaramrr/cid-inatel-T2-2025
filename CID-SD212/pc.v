@@ -10,8 +10,6 @@
 module PC (
     input  clk,                         // clock ( um ciclo de clock por instrução )
     input  rst, 
-   // input  branch,
-   // input  Zero,
     input   [31:0]  nextPc,         //valor estendido do imediato usado em caso de branch
     output  [31:0] pc                   // valor atual de PC
 );

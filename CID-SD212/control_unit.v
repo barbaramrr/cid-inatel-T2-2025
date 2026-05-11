@@ -10,6 +10,7 @@
 module control_unit (
     input       [31:0]  inst,              // Instrução de 32 bits
     output reg          branch,              // Sinal de controle para instruções de desvio 
+    output reg          jump,                // Sinal de controle para instruções de salto
     output reg          mem_read,          // Sinal de controle para leitura de memória 
     output reg          mem_to_reg,        // Sinal de controle para escreve dados no registrador a partir da memória
     output reg  [1:0]   alu_op ,            // Sinal de controle para operação da ALU
@@ -30,6 +31,7 @@ module control_unit (
                 alu_src = 1'b0;
                 alu_op = 2'b10;
                 branch = 1'b0;
+                jump = 1'b0;    
             end
             7'b0010011: begin // Operações do tipo I aritmetica
                 reg_write = 1'b1;
@@ -39,6 +41,7 @@ module control_unit (
                 alu_src = 1'b1;
                 alu_op = 2'b10; 
                 branch = 1'b0;
+                jump = 1'b0;
             end
             7'b0000011: begin // Operações do tipo I 
                 reg_write = 1'b1;
@@ -48,6 +51,17 @@ module control_unit (
                 alu_src = 1'b1;
                 alu_op = 2'b00;
                 branch = 1'b0;
+                jump = 1'b0;
+            end
+            7'b1100111: begin // Operações do tipo I de jump
+                reg_write = 1'b1;
+                mem_to_reg = 1'b0;
+                mem_read = 1'b0;
+                mem_write = 1'b0;
+                alu_src = 1'b0;
+                alu_op = 2'b00; 
+                branch = 1'b0; 
+                jump = 1'b1;
             end
             7'b0100011: begin // Operações do tipo S
                 reg_write = 1'b0;
@@ -57,6 +71,7 @@ module control_unit (
                 alu_src = 1'b1;
                 alu_op = 2'b00; 
                 branch = 1'b0;
+                jump = 1'b0;
             end
             7'b1100011: begin // Operações do tipo B
                 reg_write = 1'b0;
@@ -66,6 +81,7 @@ module control_unit (
                 alu_src = 1'b0;
                 alu_op = 2'b01; 
                 branch = 1'b1; // Ativa o sinal de controle para instruções de desvio
+                jump = 1'b0;
             end
             7'b1101111: begin // Operações do tipo J
                 reg_write = 1'b1;
@@ -74,7 +90,8 @@ module control_unit (
                 mem_write = 1'b0;
                 alu_src = 1'b0;
                 alu_op = 2'b00;
-                branch = 1'b1; 
+                branch = 1'b0; 
+                jump = 1'b1;
             end
             7'b0110111: begin // Operações do tipo U
                 reg_write = 1'b1;
@@ -84,6 +101,7 @@ module control_unit (
                 alu_src = 1'b1; // Imediato é a fonte do segundo operando da ALU
                 alu_op = 2'b00; 
                 branch = 1'b0;
+                jump = 1'b0;
             end
             7'b0010111: begin // Operações do tipo U
                 reg_write = 1'b1;
@@ -93,6 +111,7 @@ module control_unit (
                 alu_src = 1'b1; // Imediato é a fonte do segundo operando da ALU
                 alu_op = 2'b00; 
                 branch = 1'b0;
+                jump = 1'b0;
             end
 
 
