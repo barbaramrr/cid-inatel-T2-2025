@@ -14,7 +14,7 @@ module decoder (
     output  [6:0]   funct7,             // 7 bits de funct
     output  [4:0]   rd,                // 5 bits de registrador de destino
     output  [4:0]   rs1,               // 5 bits de registrador fonte 1
-    output  [4:0]   rs2,               // 5 bits de registrador fonte 2
+    output  [4:0]   rs2               // 5 bits de registrador fonte 2
 
 );
     

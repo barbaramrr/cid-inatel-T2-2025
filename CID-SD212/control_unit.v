@@ -9,17 +9,17 @@
 
 module control_unit (
     input       [31:0]  inst,              // Instrução de 32 bits
-    output reg          branch              // Sinal de controle para instruções de desvio 
+    output reg          branch,              // Sinal de controle para instruções de desvio 
     output reg          mem_read,          // Sinal de controle para leitura de memória 
     output reg          mem_to_reg,        // Sinal de controle para escreve dados no registrador a partir da memória
-    output reg  [1:0]   alu_op             // Sinal de controle para operação da ALU
+    output reg  [1:0]   alu_op ,            // Sinal de controle para operação da ALU
     output reg          mem_write,         // Sinal de controle para escrita em memória
     output reg          alu_src,           // Sinal de controle para seleção de fonte do segundo operando da ALU
-    output reg          reg_write,         // Sinal de controle para escrita em registrador
+    output reg          reg_write         // Sinal de controle para escrita em registrador
 );
     wire  [6:0] opcode;                  // opcode da instrução
     assign opcode = inst[6:0];          // Bits [6:0] para opcode
-    
+
     always @(*) begin
         case (opcode)
               7'b0110011: begin  // Operações do tipo R

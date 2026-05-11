@@ -20,13 +20,18 @@ module reg_file (
 
     // Leitura dos registradores fonte
     assign data1_r = registers[rs1];
-    assign data2_r = registers[rs2];
+    assign data2_r = registers[rs2]; 
+    integer i;
 
     // Escrita no registrador de destino
     always @(posedge clk or posedge rst) begin
+         // Inicializar o registrador x0 para zero
+
+        registers[0] = 32'b0;
+
         if (rst) begin
             // Resetar todos os registradores para zero
-            integer i;
+  
             for (i = 0; i < 32; i = i + 1) begin
                 registers[i] <= 32'b0;
             end

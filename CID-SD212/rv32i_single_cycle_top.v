@@ -25,7 +25,7 @@ module rv32i_single_cycle_top (
     wire alu_src;                      // sinal de controle para seleção de fonte do segundo operando da ALU
     wire [1:0] alu_op;                 // sinal de controle para operação da ALU
     wire branch;                       // sinal de controle para instruções de desvio 
-    wire [31:0] alu_result, data_w;            // resultado da operação da ALU
+    wire [31:0] alu_result, data_w, data_r,add_result, immgen_out, data1_from_reg, data2_from_reg;        
     wire zero_flag;                    // flag que indica se o resultado da ALU é zero
     wire pc_src;                      // resultado do somador para cálculo do próximo PC
     wire data_src;                    // sinal para selecionar entre o resultado da ALU ou os dados da memória
@@ -102,3 +102,4 @@ module rv32i_single_cycle_top (
         .inst(inst),
         .imm_out(immgen_out)
     );
+endmodule

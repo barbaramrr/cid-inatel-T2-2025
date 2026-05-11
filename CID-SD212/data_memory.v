@@ -17,7 +17,7 @@ module data_memory (
 );
 
     reg [31:0] data_rr; // registrador para ser usado no always
-    reg [31:0] mem [0:255];  32 bits
+    reg [31:0] mem [0:255];  
 
     always @(posedge clk) begin
         if (mem_write) begin
