@@ -18,11 +18,11 @@ module decoder (
 
 );
     
-    assign opcode = inst[6:0];          // Bits [6:0] para opcode
-    assign rd     = inst[11:7];         // Bits [11:7] para rd
-    assign funct3 = inst[14:12];        // Bits [14:12] para funct3
-    assign rs1    = inst[19:15];        // Bits [19:15] para rs1
-    assign rs2    = inst[24:20];        // Bits [24:20] para rs2
-    assign funct7 = inst[31:25];        // Bits [31:25] para funct7
+    assign opcode = inst[6:0];          
+    assign rd     = inst[11:7];         
+    assign funct3 = inst[14:12];        
+    assign rs1    = inst[19:15];        
+    assign rs2    = inst[24:20];        
+    assign funct7 = inst[31:25];        
 
 endmodule

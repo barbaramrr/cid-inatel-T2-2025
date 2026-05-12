@@ -31,7 +31,9 @@ module rv32i_single_cycle_top (
     
     wire zero_flag;
 
-    assign next_pc = (jump ||(branch && zero_flag ))? add_result : (pc + 4);
+    wire bne_or_beq = (funct3 == 3'b000) ? zero_flag : ~zero_flag;
+
+    assign next_pc = (jump ||(branch && bne_or_beq ))? add_result : (pc + 4);
 
     PC PC1 (
         .clk(clk),
@@ -95,7 +97,7 @@ module rv32i_single_cycle_top (
 
     assign data_alu_src = alu_src ? immgen_out : data2_from_reg;
 
-    alu ALU_unit (
+    alu ALU (
         .A(data1_from_reg),
         .B(data_alu_src), 
         .alu_control(alu_control),
@@ -103,7 +105,7 @@ module rv32i_single_cycle_top (
         .zero(zero_flag)
     );
 
-    data_memory data_mem (
+    data_memory DM (
         .clk(clk),
         .mem_write(mem_write),
         .mem_read(mem_read),

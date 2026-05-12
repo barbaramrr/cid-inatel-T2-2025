@@ -7,19 +7,17 @@
                 // Instruction Memory
 //////////////////////////////////////////////////////////////////
 module instruction_memory (
-    input  wire [31:0] addr,      // Endereço de 32 bits (vindo do PC)
-    output wire [31:0] inst       // Instrução de 32 bits (vai para o Decoder)
+    input  wire [31:0] addr,      // Endereço de 32 bits  (PC)
+    output wire [31:0] inst       // Armazena as instruções de 32 bits 
 );
 
-    reg [31:0] mem [0:255];  // Memória de instruções com 256 palavras de 32 bits
+    reg [31:0] mem [0:255];  // Memória de instruções de 32 bits, com 256 posições 
 
-    initial begin
-    //mem[0] = 32'b00000000100100010000000010010011;
-    
+    initial begin    
         $readmemb("instructions.mem", mem); 
     end
 
-    // Acessar a instrução dividindo o endereço por 4 (>> 2)
+    // Acessar a instrução dividindo o endereço por 4, por ser endereçada em 4 bytes (32 bits)
     assign inst = mem[addr >> 2]; 
 
 endmodule
