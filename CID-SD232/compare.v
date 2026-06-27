@@ -1,3 +1,5 @@
+`timescale 1 ns / 1 ps
+
 module compare(
     input clk_dest,
     input rst_n,
@@ -6,13 +8,11 @@ module compare(
 );
 
 always @(posedge clk_dest or negedge rst_n) begin
-    if (rst_n) begin
-        even_count <= 4'b0;
-    end else
-        if(count[0]==0) begin
-            even_count <= even_count + 1;
-        end
     
-end
+	if (!rst_n) begin
+		even_count <= 4'b0;
+	end else
+		if (count[0] == 0) even_count <= even_count + 1;
+	end
 
 endmodule

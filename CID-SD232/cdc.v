@@ -1,9 +1,11 @@
+`timescale 1 ns / 1 ps
+
 module cdc (
-    input wire clk_src,       
-    input wire clk_dest,      
-    input wire rst_n,
-    input wire [3:0] count,   
-    output reg [3:0] sync_out 
+    input clk_src,       
+    input clk_dest,      
+    input rst_n,
+    input [3:0] count,   
+    output [3:0] sync_out 
 );
 
     reg [3:0] q_src; 
@@ -21,13 +23,12 @@ module cdc (
         if (!rst_n) begin
             q1       <= 4'b0;
             q2       <= 4'b0;
-            sync_out <= 4'b0;
         end else begin
-  
             q1       <= q_src; 
-            q2       <= q1;
-            sync_out <= q2;    
+            q2       <= q1;    
         end
     end
+    
+    assign sync_out = rst_n ? q2 : 4'b0;
 
 endmodule

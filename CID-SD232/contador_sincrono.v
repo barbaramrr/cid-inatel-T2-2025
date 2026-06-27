@@ -1,6 +1,8 @@
+`timescale 1 ns / 1 ps
+
 module contador_sincrono (
-    input wire clk_src,                       
-    input wire rst_n,                                            
+    input clk_src,                       
+    input rst_n,                                            
     output reg [3:0] count               
 );
 
