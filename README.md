@@ -1,4 +1,4 @@
-# CI DIGITAL - INATEL T2 / 2025
+# CI DIGITAL INATEL - T25S2
 
 > Descrição da Residência em Circuitos Digitais:
 
